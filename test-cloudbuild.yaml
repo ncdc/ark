@@ -1,0 +1,6 @@
+steps:
+  - name: 'alpine'
+    args:
+      - ash
+      - -c
+      - "echo PROJECT_ID=$PROJECT_ID; echo BUILD_ID=$BUILD_ID; echo REPO_NAME=$REPO_NAME; echo BRANCH_NAME=$BRANCH_NAME; echo TAG_NAME=$TAG_NAME; echo COMMIT_SHA=$COMMIT_SHA; echo SHORT_SHA=$SHORT_SHA"
