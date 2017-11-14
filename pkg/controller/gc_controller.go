@@ -172,7 +172,14 @@ func (c *gcController) garbageCollectBackup(backup *api.Backup, deleteBackupFile
 // ones.
 func (c *gcController) garbageCollectBackups(backups []*api.Backup, expiration time.Time, deleteBackupFiles bool) {
 	for _, backup := range backups {
-		if backup.Status.Expiration.Time.After(expiration) {
+		backupExpiration := backup.Status.Expiration.Time
+
+		if backupExpiration.IsZero() {
+			c.logger.WithField("backup", kube.NamespaceAndName(backup)).Info("Backup has no expiration, skipping")
+			continue
+		}
+
+		if backupExpiration.After(expiration) {
 			c.logger.WithField("backup", kube.NamespaceAndName(backup)).Info("Backup has not expired yet, skipping")
 			continue
 		}
