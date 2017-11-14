@@ -21,6 +21,10 @@ import (
 	"time"
 )
 
+// DefaultSharedCredentialsFile is the default location for the file containing cloud provider
+// credentials.
+const DefaultSharedCredentialsFile = "/credentials/cloud"
+
 // ObjectStore exposes basic object-storage operations required
 // by Ark.
 type ObjectStore interface {

@@ -18,7 +18,6 @@ package aws
 
 import (
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/pkg/errors"
 
@@ -36,19 +35,6 @@ var iopsVolumeTypes = sets.NewString("io1")
 
 type blockStore struct {
 	ec2 *ec2.EC2
-}
-
-func getSession(config *aws.Config) (*session.Session, error) {
-	sess, err := session.NewSession(config)
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-
-	if _, err := sess.Config.Credentials.Get(); err != nil {
-		return nil, errors.WithStack(err)
-	}
-
-	return sess, nil
 }
 
 func NewBlockStore() cloudprovider.BlockStore {
