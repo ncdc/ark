@@ -22,8 +22,6 @@ import (
 
 	"github.com/pkg/errors"
 	uuid "github.com/satori/go.uuid"
-	"golang.org/x/oauth2"
-	"golang.org/x/oauth2/google"
 	"google.golang.org/api/compute/v0.beta"
 
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -49,7 +47,7 @@ func (b *blockStore) Init(config map[string]string) error {
 		return errors.Errorf("missing %s in gcp configuration", projectKey)
 	}
 
-	client, err := google.DefaultClient(oauth2.NoContext, compute.ComputeScope)
+	client, err := getClient(compute.ComputeScope)
 	if err != nil {
 		return errors.WithStack(err)
 	}

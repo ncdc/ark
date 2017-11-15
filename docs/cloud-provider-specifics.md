@@ -170,11 +170,6 @@ Now that you have your Google Cloud credentials stored in a Secret, you need to 
   * Replace `<YOUR_BUCKET>` and `<YOUR_PROJECT>`. See the [Config definition][7] for details.
 
 
-* In file `examples/common/10-deployment.yaml`:
-
-  * Change `spec.template.spec.containers[*].env.name` to "GOOGLE_APPLICATION_CREDENTIALS".
-
-
 * (Optional) If you are running the Nginx example, in file `examples/nginx-app/with-pv.yaml`:
 
     * Replace `<YOUR_STORAGE_CLASS_NAME>` with `standard`. This is GCP's default `StorageClass` name.

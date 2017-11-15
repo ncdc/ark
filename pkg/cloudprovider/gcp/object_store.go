@@ -24,7 +24,6 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	// TODO switch to using newstorage
 	newstorage "cloud.google.com/go/storage"
@@ -32,8 +31,6 @@ import (
 
 	"github.com/heptio/ark/pkg/cloudprovider"
 )
-
-const credentialsEnvVar = "GOOGLE_APPLICATION_CREDENTIALS"
 
 type objectStore struct {
 	gcs            *storage.Service
@@ -67,7 +64,7 @@ func (o *objectStore) Init(config map[string]string) error {
 		return errors.Errorf("credentials file pointed to by %s does not contain a private key", credentialsEnvVar)
 	}
 
-	client, err := google.DefaultClient(oauth2.NoContext, storage.DevstorageReadWriteScope)
+	client, err := getClient(storage.DevstorageReadWriteScope)
 	if err != nil {
 		return errors.WithStack(err)
 	}
