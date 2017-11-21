@@ -36,9 +36,19 @@ func NewObjectStore() cloudprovider.ObjectStore {
 }
 
 func (o *objectStore) Init(config map[string]string) error {
-	cfg := getConfig()
+	clientConfig, err := loadConfig()
+	if err != nil {
+		return err
+	}
 
-	storageClient, err := storage.NewBasicClient(cfg[azureStorageAccountIDKey], cfg[azureStorageKeyKey])
+	if clientConfig.StorageAccountID == "" {
+		return errors.New("Missing storage_account_id in credentials file")
+	}
+	if clientConfig.StorageKey == "" {
+		return errors.New("Missing storage_key in credentials file")
+	}
+
+	storageClient, err := storage.NewBasicClient(clientConfig.StorageAccountID, clientConfig.StorageKey)
 	if err != nil {
 		return errors.WithStack(err)
 	}

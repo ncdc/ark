@@ -25,6 +25,12 @@ To integrate Heptio Ark with AWS, you should follow the instructions below to cr
 
 1. If you do not have the AWS CLI locally installed, follow the [user guide][5] to set it up.
 
+2. Create an S3 bucket for Ark to use, changing the bucket name and region as desired:
+
+    ```
+    aws s3 mb s3://your-bucket-name-here --region us-east-1
+    ```
+
 2. Create an IAM user:
 
     ```
@@ -176,8 +182,11 @@ Now that you have your Google Cloud credentials stored in a Secret, you need to 
 
 ### Azure
 
+#### Kubernetes cluster
+Ensure that the VMs for your agent pool allow Managed Disks. Also, if possible, use Premium Managed
+Disks as these are backed by SSD.
+
 #### Service principal creation
-To integrate Heptio Ark with Azure, you should follow the instructions below to create an Ark-specific [service principal][17].
 
 1. If you do not have the `az` Azure CLI 2.0 locally installed, follow the [user guide][18] to set it up. Once done, run:
 
@@ -187,74 +196,102 @@ To integrate Heptio Ark with Azure, you should follow the instructions below to 
 
 2. There are seven environment variables that need to be set for Heptio Ark to work properly. The following steps detail how to acquire these, in the process of setting up the necessary RBAC.
 
-3. List your account:
+3. Obtain your Azure Account Subscription ID and Tenant ID:
 
     ```
-    az account list
-    ```
-    Save the relevant response values into environment variables: `id` corresponds to `$AZURE_SUBSCRIPTION_ID` and `tenantId` corresponds to `$AZURE_TENANT_ID`.
-
-4. Assuming that you already have a running Kubernetes cluster on Azure, you should have a corresponding resource group as well. List your current groups to find it:
-
-    ```
-    az group list
-    ```
-     Get your cluster's group `name` from the response, and use it to set `$AZURE_RESOURCE_GROUP`. (Also note the `location`--this is later used in the Azure-specific portion of the Ark Config).
-
-5. Create a service principal with the "Contributor" role:
-
-    ```
-    az ad sp create-for-rbac --role="Contributor" --name="heptio-ark"
-    ```
-    From the response, save `appId` into `$AZURE_CLIENT_ID` and `password` into `$AZURE_CLIENT_SECRET`.
-
-6. Login into the `heptio-ark` service principal account:
-
-    ```
-    az login --service-principal \
-        --username http://heptio-ark \
-        --password $AZURE_CLIENT_SECRET \
-        --tenant $AZURE_TENANT_ID
+    AZURE_SUBSCRIPTION_ID=`az account list --query '[?isDefault].id' -o tsv`
+    AZURE_TENANT_ID=`az account list --query '[?isDefault].tenantId' -o tsv`
     ```
 
-7. Specify a *globally-unique* storage account id and save it in `$AZURE_STORAGE_ACCOUNT_ID`. Then create the storage account, specifying the optional `--location` flag if you do not have defaults from `az configure`:
+4. Set the name of the Resource Group that contains your Kubernetes cluster.
 
     ```
+    AZURE_RESOURCE_GROUP=Kubernetes
+    ```
+
+    If you are unsure of the Resource Group name, run the following command to get a list that you
+    can select from. Then set the AZURE_RESOURCE_GROUP environment variable to the appropriate
+    value.
+
+    ```
+    az group list --query '[].{ResourceGroup: name, Location:location}'
+    ```
+
+5. Create a [service principal][17] with the "Contributor" role. This will have subscription-wide access,
+   so protect this credential! You can specify a password or let the `az ad sp create-for-rbac`
+   command create one for you.
+
+    ```
+    # Create service principal and specify your own password
+    AZURE_CLIENT_SECRET=super_secret_and_high_entropy_password
+    az ad sp create-for-rbac --name "heptio-ark" --role "Contributor" --password $AZURE_CLIENT_SECRET
+
+    # Or create service principal and let the cli generate a password for you. Ensure we capture the password though.
+    AZURE_CLIENT_SECRET=`az ad sp create-for-rbac --name "heptio-ark" --role "Contributor" --query 'password' -o tsv`
+
+    # After creating the service principal, obtain the client id
+    AZURE_CLIENT_ID=`az ad sp list --display-name "heptio-ark" --query '[0].appId' -o tsv`
+    ```
+
+6.  Create the storage account and blob container for Ark to store the backups in.
+
+    The storage account can be created in the same Resource Group as your Kubernetes cluster or
+    separated into its own Resource Group. The example below shows the storage account created in a
+    separate Ark_Backups Resource Group.
+
+    The storage account needs to be created with a globally unique id since this is used for dns.
+    The random function ensures you don't have to come up with a unique name. The storage account is
+    created with encryption at rest capabilities (Microsoft managed keys) and is configured to only
+    allow access via https.
+
+    ```
+    # Create a resource group for the backups storage account
+    AZURE_BACKUP_RESOURCE_GROUP=Ark_Backups
+    az group create -n $AZURE_BACKUP_RESOURCE_GROUP -l WestUS
+
+    # Create the storage account
+    AZURE_STORAGE_ACCOUNT_ID="ark`cat /proc/sys/kernel/random/uuid | cut -d '-' -f5`"
     az storage account create \
-        --name $AZURE_STORAGE_ACCOUNT_ID \
-        --resource-group $AZURE_RESOURCE_GROUP \
-        --sku Standard_GRS
-    ```
-    You will encounter an error message if the storage account ID is not unique; change it accordingly.
+      --name $AZURE_STORAGE_ACCOUNT_ID \
+      --resource-group $AZURE_BACKUP_RESOURCE_GROUP \
+      --sku Standard_GRS \
+      --encryption-services blob \
+      --https-only true \
+      --kind BlobStorage \
+      --access-tier Hot
 
-8. Get the keys for your storage account:
+    # create the blob container named "ark"
+    az storage container create -n ark --public-access off --account-name $AZURE_STORAGE_ACCOUNT_ID
 
+    # obtain the storage access key for the storage account just created
+    AZURE_STORAGE_KEY=`az storage account keys list --account-name $AZURE_STORAGE_ACCOUNT_ID --resource-group $AZURE_BACKUP_RESOURCE_GROUP --query [0].value -o tsv`
     ```
-    az storage account keys list \
-        --account-name $AZURE_STORAGE_ACCOUNT_ID \
-        --resource-group $AZURE_RESOURCE_GROUP
-    ```
-    Set `$AZURE_STORAGE_KEY` to any one of the `value`s returned.
+
 
 #### Credentials and configuration
 
 In the Ark root directory, run the following to first set up namespaces, RBAC, and other scaffolding:
-```
-kubectl apply -f examples/common/00-prereqs.yaml
-```
 
-Now you need to create a Secret that contains all the seven environment variables you just set. The command looks like the following:
-```
-kubectl create secret generic cloud-credentials \
-    --namespace heptio-ark \
-    --from-literal AZURE_SUBSCRIPTION_ID=${AZURE_SUBSCRIPTION_ID} \
-    --from-literal AZURE_TENANT_ID=${AZURE_TENANT_ID} \
-    --from-literal AZURE_RESOURCE_GROUP=${AZURE_RESOURCE_GROUP} \
-    --from-literal AZURE_CLIENT_ID=${AZURE_CLIENT_ID} \
-    --from-literal AZURE_CLIENT_SECRET=${AZURE_CLIENT_SECRET} \
-    --from-literal AZURE_STORAGE_ACCOUNT_ID=${AZURE_STORAGE_ACCOUNT_ID} \
-    --from-literal AZURE_STORAGE_KEY=${AZURE_STORAGE_KEY}
-```
+    ```
+    kubectl apply -f examples/common/00-prereqs.yaml
+    ```
+
+Now you need to create a Secret for your Azure credentials for Ark. The commands looks like the following:
+    ```
+    cat <<EOF > credentials-ark
+    subscription_id: ${AZURE_SUBSCRIPTION_ID}
+    tenant_id: ${AZURE_TENANT_ID}
+    resource_group: ${AZURE_RESOURCE_GROUP}
+    client_id: ${AZURE_CLIENT_ID}
+    client_secret: ${AZURE_CLIENT_SECRET}
+    storage_account_id: ${AZURE_STORAGE_ACCOUNT_ID}
+    storage_key: ${AZURE_STORAGE_KEY}
+    EOF
+
+    kubectl create secret generic cloud-credentials \
+      --namespace heptio-ark \
+      --from-file cloud=credentials-ark
+    ```
 
 Now that you have your Azure credentials stored in a Secret, you need to replace some placeholder values in the template files. Specifically, you need to change the following:
 
@@ -267,14 +304,15 @@ Now that you have your Azure credentials stored in a Secret, you need to replace
 
 ### Ark server
 
-Make sure that you have run `kubectl apply -f examples/common/00-prereqs.yaml` first (this command is incorporated in the previous setup instructions because it creates the necessary namespaces).
+Make sure that you have run `kubectl apply -f examples/common/00-prereqs.yaml` first (this command
+is incorporated in the previous setup instructions because it creates the necessary namespaces).
 
 * **AWS and GCP**
 
   Start the Ark server itself, using the Config from the appropriate cloud-provider-specific directory:
   ```
-  kubectl apply -f examples/common/10-deployment.yaml
   kubectl apply -f examples/<CLOUD-PROVIDER>/
+  kubectl apply -f examples/common/10-deployment.yaml
   ```
 * **Azure**
 

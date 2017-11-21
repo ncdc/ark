@@ -19,11 +19,9 @@ package azure
 import (
 	"context"
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/arm/disk"
-	"github.com/Azure/azure-sdk-for-go/arm/examples/helpers"
 	"github.com/Azure/azure-sdk-for-go/arm/resources/subscriptions"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
@@ -34,14 +32,6 @@ import (
 )
 
 const (
-	azureClientIDKey         string = "AZURE_CLIENT_ID"
-	azureClientSecretKey     string = "AZURE_CLIENT_SECRET"
-	azureSubscriptionIDKey   string = "AZURE_SUBSCRIPTION_ID"
-	azureTenantIDKey         string = "AZURE_TENANT_ID"
-	azureStorageAccountIDKey string = "AZURE_STORAGE_ACCOUNT_ID"
-	azureStorageKeyKey       string = "AZURE_STORAGE_KEY"
-	azureResourceGroupKey    string = "AZURE_RESOURCE_GROUP"
-
 	locationKey   = "location"
 	apiTimeoutKey = "apiTimeout"
 )
@@ -53,24 +43,6 @@ type blockStore struct {
 	resourceGroup string
 	location      string
 	apiTimeout    time.Duration
-}
-
-func getConfig() map[string]string {
-	cfg := map[string]string{
-		azureClientIDKey:         "",
-		azureClientSecretKey:     "",
-		azureSubscriptionIDKey:   "",
-		azureTenantIDKey:         "",
-		azureStorageAccountIDKey: "",
-		azureStorageKeyKey:       "",
-		azureResourceGroupKey:    "",
-	}
-
-	for key := range cfg {
-		cfg[key] = os.Getenv(key)
-	}
-
-	return cfg
 }
 
 func NewBlockStore() cloudprovider.BlockStore {
@@ -97,15 +69,34 @@ func (b *blockStore) Init(config map[string]string) error {
 		apiTimeout = 2 * time.Minute
 	}
 
-	cfg := getConfig()
+	clientConfig, err := loadConfig()
+	if err != nil {
+		return err
+	}
 
-	spt, err := helpers.NewServicePrincipalTokenFromCredentials(cfg, azure.PublicCloud.ResourceManagerEndpoint)
+	if clientConfig.TenantID == "" {
+		return errors.New("Missing tenant_id in credentials file")
+	}
+	if clientConfig.ClientID == "" {
+		return errors.New("Missing client_id in credentials file")
+	}
+	if clientConfig.ClientSecret == "" {
+		return errors.New("Missing client_secret in credentials file")
+	}
+	if clientConfig.SubscriptionID == "" {
+		return errors.New("Missing subscription_id in credentials file")
+	}
+	if clientConfig.ResourceGroup == "" {
+		return errors.New("Missing resource_group in credentials file")
+	}
+
+	spt, err := getServicePrincipalToken(clientConfig.TenantID, clientConfig.ClientID, clientConfig.ClientSecret, azure.PublicCloud.ResourceManagerEndpoint)
 	if err != nil {
 		return errors.Wrap(err, "error creating new service principal token")
 	}
 
-	disksClient := disk.NewDisksClient(cfg[azureSubscriptionIDKey])
-	snapsClient := disk.NewSnapshotsClient(cfg[azureSubscriptionIDKey])
+	disksClient := disk.NewDisksClient(clientConfig.SubscriptionID)
+	snapsClient := disk.NewSnapshotsClient(clientConfig.SubscriptionID)
 
 	authorizer := autorest.NewBearerAuthorizer(spt)
 	disksClient.Authorizer = authorizer
@@ -115,7 +106,7 @@ func (b *blockStore) Init(config map[string]string) error {
 	groupClient := subscriptions.NewGroupClient()
 	groupClient.Authorizer = authorizer
 
-	locs, err := groupClient.ListLocations(cfg[azureSubscriptionIDKey])
+	locs, err := groupClient.ListLocations(clientConfig.SubscriptionID)
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -138,8 +129,8 @@ func (b *blockStore) Init(config map[string]string) error {
 
 	b.disks = &disksClient
 	b.snaps = &snapsClient
-	b.subscription = cfg[azureSubscriptionIDKey]
-	b.resourceGroup = cfg[azureResourceGroupKey]
+	b.subscription = clientConfig.SubscriptionID
+	b.resourceGroup = clientConfig.ResourceGroup
 	b.location = location
 	b.apiTimeout = apiTimeout
 
