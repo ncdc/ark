@@ -21,6 +21,7 @@ import (
 	"compress/gzip"
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -182,6 +183,11 @@ func (kb *kubernetesBackupper) Backup(backup *api.Backup, backupFile, logFile io
 	tw := tar.NewWriter(gzippedData)
 	defer tw.Close()
 
+	itemStorage := &tarWriterItemStorage{
+		w:       tw,
+		modTime: time.Now(),
+	}
+
 	gzippedLog := gzip.NewWriter(logFile)
 	defer gzippedLog.Close()
 
@@ -235,7 +241,7 @@ func (kb *kubernetesBackupper) Backup(backup *api.Backup, backupFile, logFile io
 		cohabitatingResources,
 		resolvedActions,
 		kb.podCommandExecutor,
-		tw,
+		itemStorage,
 		resourceHooks,
 		kb.snapshotService,
 	)
@@ -254,10 +260,4 @@ func (kb *kubernetesBackupper) Backup(backup *api.Backup, backupFile, logFile io
 	}
 
 	return err
-}
-
-type tarWriter interface {
-	io.Closer
-	Write([]byte) (int, error)
-	WriteHeader(*tar.Header) error
 }

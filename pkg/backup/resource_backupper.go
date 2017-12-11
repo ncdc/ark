@@ -45,7 +45,7 @@ type resourceBackupperFactory interface {
 		cohabitatingResources map[string]*cohabitatingResource,
 		actions []resolvedAction,
 		podCommandExecutor podCommandExecutor,
-		tarWriter tarWriter,
+		itemStorage ItemStorage,
 		resourceHooks []resourceHook,
 		snapshotService cloudprovider.SnapshotService,
 	) resourceBackupper
@@ -65,7 +65,7 @@ func (f *defaultResourceBackupperFactory) newResourceBackupper(
 	cohabitatingResources map[string]*cohabitatingResource,
 	actions []resolvedAction,
 	podCommandExecutor podCommandExecutor,
-	tarWriter tarWriter,
+	itemStorage ItemStorage,
 	resourceHooks []resourceHook,
 	snapshotService cloudprovider.SnapshotService,
 ) resourceBackupper {
@@ -81,7 +81,7 @@ func (f *defaultResourceBackupperFactory) newResourceBackupper(
 		actions:               actions,
 		cohabitatingResources: cohabitatingResources,
 		podCommandExecutor:    podCommandExecutor,
-		tarWriter:             tarWriter,
+		itemStorage:           itemStorage,
 		resourceHooks:         resourceHooks,
 		snapshotService:       snapshotService,
 		itemBackupperFactory:  &defaultItemBackupperFactory{},
@@ -104,7 +104,7 @@ type defaultResourceBackupper struct {
 	cohabitatingResources map[string]*cohabitatingResource
 	actions               []resolvedAction
 	podCommandExecutor    podCommandExecutor
-	tarWriter             tarWriter
+	itemStorage           ItemStorage
 	resourceHooks         []resourceHook
 	snapshotService       cloudprovider.SnapshotService
 	itemBackupperFactory  itemBackupperFactory
@@ -176,7 +176,7 @@ func (rb *defaultResourceBackupper) backupResource(
 		rb.backedUpItems,
 		rb.actions,
 		rb.podCommandExecutor,
-		rb.tarWriter,
+		rb.itemStorage,
 		rb.resourceHooks,
 		rb.dynamicFactory,
 		rb.discoveryHelper,

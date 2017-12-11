@@ -17,10 +17,8 @@ limitations under the License.
 package backup
 
 import (
-	"archive/tar"
 	"encoding/json"
 	"path/filepath"
-	"time"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -46,7 +44,7 @@ type itemBackupperFactory interface {
 		backedUpItems map[itemKey]struct{},
 		actions []resolvedAction,
 		podCommandExecutor podCommandExecutor,
-		tarWriter tarWriter,
+		itemStorage ItemStorage,
 		resourceHooks []resourceHook,
 		dynamicFactory client.DynamicFactory,
 		discoveryHelper discovery.Helper,
@@ -62,7 +60,7 @@ func (f *defaultItemBackupperFactory) newItemBackupper(
 	backedUpItems map[itemKey]struct{},
 	actions []resolvedAction,
 	podCommandExecutor podCommandExecutor,
-	tarWriter tarWriter,
+	itemStorage ItemStorage,
 	resourceHooks []resourceHook,
 	dynamicFactory client.DynamicFactory,
 	discoveryHelper discovery.Helper,
@@ -74,7 +72,7 @@ func (f *defaultItemBackupperFactory) newItemBackupper(
 		resources:       resources,
 		backedUpItems:   backedUpItems,
 		actions:         actions,
-		tarWriter:       tarWriter,
+		itemStorage:     itemStorage,
 		resourceHooks:   resourceHooks,
 		dynamicFactory:  dynamicFactory,
 		discoveryHelper: discoveryHelper,
@@ -100,7 +98,7 @@ type defaultItemBackupper struct {
 	resources       *collections.IncludesExcludes
 	backedUpItems   map[itemKey]struct{}
 	actions         []resolvedAction
-	tarWriter       tarWriter
+	itemStorage     ItemStorage
 	resourceHooks   []resourceHook
 	dynamicFactory  client.DynamicFactory
 	discoveryHelper discovery.Helper
@@ -239,20 +237,8 @@ func (ib *defaultItemBackupper) backupItem(logger logrus.FieldLogger, obj runtim
 		return errors.WithStack(err)
 	}
 
-	hdr := &tar.Header{
-		Name:     filePath,
-		Size:     int64(len(itemBytes)),
-		Typeflag: tar.TypeReg,
-		Mode:     0755,
-		ModTime:  time.Now(),
-	}
-
-	if err := ib.tarWriter.WriteHeader(hdr); err != nil {
-		return errors.WithStack(err)
-	}
-
-	if _, err := ib.tarWriter.Write(itemBytes); err != nil {
-		return errors.WithStack(err)
+	if err := ib.itemStorage.Write(filePath, itemBytes); err != nil {
+		return errors.Wrap(err, "unable to persist item")
 	}
 
 	return nil
