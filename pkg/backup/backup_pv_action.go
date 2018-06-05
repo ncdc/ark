@@ -17,22 +17,21 @@ limitations under the License.
 package backup
 
 import (
-	"github.com/sirupsen/logrus"
-
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/kuberesource"
+	"github.com/heptio/ark/pkg/logger"
 	"github.com/heptio/ark/pkg/util/collections"
 )
 
 // backupPVAction inspects a PersistentVolumeClaim for the PersistentVolume
 // that it references and backs it up
 type backupPVAction struct {
-	log logrus.FieldLogger
+	log logger.Interface
 }
 
-func NewBackupPVAction(log logrus.FieldLogger) ItemAction {
+func NewBackupPVAction(log logger.Interface) ItemAction {
 	return &backupPVAction{log: log}
 }
 

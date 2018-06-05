@@ -27,7 +27,6 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -43,6 +42,7 @@ import (
 	"github.com/heptio/ark/pkg/client"
 	"github.com/heptio/ark/pkg/cloudprovider"
 	"github.com/heptio/ark/pkg/discovery"
+	"github.com/heptio/ark/pkg/logger"
 	"github.com/heptio/ark/pkg/util/collections"
 	kubeutil "github.com/heptio/ark/pkg/util/kube"
 	arktest "github.com/heptio/ark/pkg/util/test"
@@ -649,7 +649,7 @@ type mockGroupBackupperFactory struct {
 }
 
 func (f *mockGroupBackupperFactory) newGroupBackupper(
-	log logrus.FieldLogger,
+	log logger.Interface,
 	backup *v1.Backup,
 	namespaces, resources *collections.IncludesExcludes,
 	labelSelector string,

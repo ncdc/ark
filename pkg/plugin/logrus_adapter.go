@@ -21,6 +21,7 @@ import (
 	"log"
 
 	hclog "github.com/hashicorp/go-hclog"
+	"github.com/heptio/ark/pkg/logger"
 	"github.com/sirupsen/logrus"
 )
 
@@ -29,7 +30,7 @@ const pluginNameField = "pluginName"
 // logrusAdapter implements the hclog.Logger interface and
 // delegates all calls to a logrus logger.
 type logrusAdapter struct {
-	impl  logrus.FieldLogger
+	impl  logger.Interface
 	level logrus.Level
 	name  string
 }
@@ -146,7 +147,7 @@ func (l *logrusAdapter) Named(name string) hclog.Logger {
 // which appends the given value to the current name.
 func (l *logrusAdapter) ResetNamed(name string) hclog.Logger {
 	return &logrusAdapter{
-		impl:  l.impl.WithField(pluginNameField, name),
+		impl:  l.impl.WithFields(pluginNameField, name),
 		level: l.level,
 		name:  name,
 	}

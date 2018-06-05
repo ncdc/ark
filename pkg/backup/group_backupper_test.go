@@ -23,9 +23,9 @@ import (
 	"github.com/heptio/ark/pkg/client"
 	"github.com/heptio/ark/pkg/cloudprovider"
 	"github.com/heptio/ark/pkg/discovery"
+	"github.com/heptio/ark/pkg/logger"
 	"github.com/heptio/ark/pkg/util/collections"
 	arktest "github.com/heptio/ark/pkg/util/test"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -146,7 +146,7 @@ type mockResourceBackupperFactory struct {
 }
 
 func (rbf *mockResourceBackupperFactory) newResourceBackupper(
-	log logrus.FieldLogger,
+	log logger.Interface,
 	backup *v1.Backup,
 	namespaces *collections.IncludesExcludes,
 	resources *collections.IncludesExcludes,

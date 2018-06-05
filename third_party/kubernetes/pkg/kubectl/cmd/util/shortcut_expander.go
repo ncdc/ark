@@ -20,8 +20,7 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/sirupsen/logrus"
-
+	"github.com/heptio/ark/pkg/logger"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/discovery"
@@ -39,12 +38,12 @@ type shortcutExpander struct {
 	RESTMapper meta.RESTMapper
 
 	discoveryClient discovery.DiscoveryInterface
-	logger          logrus.FieldLogger
+	logger          logger.Interface
 }
 
 var _ meta.RESTMapper = &shortcutExpander{}
 
-func NewShortcutExpander(delegate meta.RESTMapper, client discovery.DiscoveryInterface, logger logrus.FieldLogger) (shortcutExpander, error) {
+func NewShortcutExpander(delegate meta.RESTMapper, client discovery.DiscoveryInterface, logger logger.Interface) (shortcutExpander, error) {
 	if client == nil {
 		return shortcutExpander{}, errors.New("Please provide discovery client to shortcut expander")
 	}
@@ -97,7 +96,7 @@ func (e shortcutExpander) getShortcutMappings() ([]ResourceShortcuts, error) {
 				for _, shortName := range apiRes.ShortNames {
 					gv, err := schema.ParseGroupVersion(apiResources.GroupVersion)
 					if err != nil {
-						e.logger.WithError(err).WithField("groupVersion", apiResources.GroupVersion).Error("Unable to parse groupversion")
+						e.logger.WithError(err).WithFields("groupVersion", apiResources.GroupVersion).Error("Unable to parse groupversion")
 						continue
 					}
 					rs := ResourceShortcuts{

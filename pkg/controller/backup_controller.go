@@ -45,6 +45,7 @@ import (
 	arkv1client "github.com/heptio/ark/pkg/generated/clientset/versioned/typed/ark/v1"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions/ark/v1"
 	listers "github.com/heptio/ark/pkg/generated/listers/ark/v1"
+	"github.com/heptio/ark/pkg/logger"
 	"github.com/heptio/ark/pkg/plugin"
 	"github.com/heptio/ark/pkg/util/collections"
 	"github.com/heptio/ark/pkg/util/encode"
@@ -64,7 +65,7 @@ type backupController struct {
 	syncHandler      func(backupName string) error
 	queue            workqueue.RateLimitingInterface
 	clock            clock.Clock
-	logger           logrus.FieldLogger
+	logger           logger.Interface
 	pluginManager    plugin.Manager
 	backupTracker    BackupTracker
 }
@@ -76,7 +77,7 @@ func NewBackupController(
 	backupService cloudprovider.BackupService,
 	bucket string,
 	pvProviderExists bool,
-	logger logrus.FieldLogger,
+	logger logger.Interface,
 	pluginManager plugin.Manager,
 	backupTracker BackupTracker,
 ) Interface {
@@ -115,7 +116,7 @@ func NewBackupController(
 
 				key, err := cache.MetaNamespaceKeyFunc(backup)
 				if err != nil {
-					c.logger.WithError(err).WithField("backup", backup).Error("Error creating queue key, item not added to queue")
+					c.logger.WithError(err).WithFields("backup", backup).Error("Error creating queue key, item not added to queue")
 					return
 				}
 				c.queue.Add(key)
@@ -192,7 +193,7 @@ func (controller *backupController) processNextWorkItem() bool {
 		return true
 	}
 
-	controller.logger.WithError(err).WithField("key", key).Error("Error in syncHandler, re-adding item to queue")
+	controller.logger.WithError(err).WithFields("key", key).Error("Error in syncHandler, re-adding item to queue")
 	// we had an error processing the item so add it back
 	// into the queue for re-processing with rate-limiting
 	controller.queue.AddRateLimited(key)
@@ -201,7 +202,7 @@ func (controller *backupController) processNextWorkItem() bool {
 }
 
 func (controller *backupController) processBackup(key string) error {
-	logContext := controller.logger.WithField("key", key)
+	logContext := controller.logger.WithFields("key", key)
 
 	logContext.Debug("Running processBackup")
 	ns, name, err := cache.SplitMetaNamespaceKey(key)
@@ -325,7 +326,7 @@ func (controller *backupController) getValidationErrors(itm *api.Backup) []strin
 }
 
 func (controller *backupController) runBackup(backup *api.Backup, bucket string) error {
-	log := controller.logger.WithField("backup", kubeutil.NamespaceAndName(backup))
+	log := controller.logger.WithFields("backup", kubeutil.NamespaceAndName(backup))
 	log.Info("Starting backup")
 
 	logFile, err := ioutil.TempFile("", "")
@@ -377,11 +378,11 @@ func (controller *backupController) runBackup(backup *api.Backup, bucket string)
 	return kerrors.NewAggregate(errs)
 }
 
-func closeAndRemoveFile(file *os.File, log logrus.FieldLogger) {
+func closeAndRemoveFile(file *os.File, log logger.Interface) {
 	if err := file.Close(); err != nil {
-		log.WithError(err).WithField("file", file.Name()).Error("error closing file")
+		log.WithError(err).WithFields("file", file.Name()).Error("error closing file")
 	}
 	if err := os.Remove(file.Name()); err != nil {
-		log.WithError(err).WithField("file", file.Name()).Error("error removing file")
+		log.WithError(err).WithFields("file", file.Name()).Error("error removing file")
 	}
 }

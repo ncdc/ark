@@ -18,7 +18,6 @@ package backup
 
 import (
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 
 	rbac "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -29,16 +28,17 @@ import (
 
 	"github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/kuberesource"
+	"github.com/heptio/ark/pkg/logger"
 )
 
 // serviceAccountAction implements ItemAction.
 type serviceAccountAction struct {
-	log                 logrus.FieldLogger
+	log                 logger.Interface
 	clusterRoleBindings []rbac.ClusterRoleBinding
 }
 
 // NewServiceAccountAction creates a new ItemAction for service accounts.
-func NewServiceAccountAction(log logrus.FieldLogger, client rbacclient.ClusterRoleBindingInterface) (ItemAction, error) {
+func NewServiceAccountAction(log logger.Interface, client rbacclient.ClusterRoleBindingInterface) (ItemAction, error) {
 	clusterRoleBindings, err := client.List(metav1.ListOptions{})
 	if err != nil {
 		return nil, errors.WithStack(err)

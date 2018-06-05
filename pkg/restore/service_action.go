@@ -17,19 +17,18 @@ limitations under the License.
 package restore
 
 import (
-	"github.com/sirupsen/logrus"
-
 	"k8s.io/apimachinery/pkg/runtime"
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
+	"github.com/heptio/ark/pkg/logger"
 	"github.com/heptio/ark/pkg/util/collections"
 )
 
 type serviceAction struct {
-	log logrus.FieldLogger
+	log logger.Interface
 }
 
-func NewServiceAction(log logrus.FieldLogger) ItemAction {
+func NewServiceAction(log logger.Interface) ItemAction {
 	return &serviceAction{
 		log: log,
 	}

@@ -25,9 +25,9 @@ import (
 	"time"
 
 	"github.com/heptio/ark/pkg/apis/ark/v1"
+	"github.com/heptio/ark/pkg/logger"
 	arktest "github.com/heptio/ark/pkg/util/test"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -270,7 +270,7 @@ type mockPodCommandExecutor struct {
 	mock.Mock
 }
 
-func (e *mockPodCommandExecutor) executePodCommand(log logrus.FieldLogger, item map[string]interface{}, namespace, name, hookName string, hook *v1.ExecHook) error {
+func (e *mockPodCommandExecutor) executePodCommand(log logger.Interface, item map[string]interface{}, namespace, name, hookName string, hook *v1.ExecHook) error {
 	args := e.Called(log, item, namespace, name, hookName, hook)
 	return args.Error(0)
 }

@@ -24,7 +24,6 @@ import (
 
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,6 +39,7 @@ import (
 	arkv1client "github.com/heptio/ark/pkg/generated/clientset/versioned/typed/ark/v1"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions/ark/v1"
 	listers "github.com/heptio/ark/pkg/generated/listers/ark/v1"
+	"github.com/heptio/ark/pkg/logger"
 	"github.com/heptio/ark/pkg/util/kube"
 )
 
@@ -54,7 +54,7 @@ type downloadRequestController struct {
 	syncHandler                 func(key string) error
 	queue                       workqueue.RateLimitingInterface
 	clock                       clock.Clock
-	logger                      logrus.FieldLogger
+	logger                      logger.Interface
 }
 
 // NewDownloadRequestController creates a new DownloadRequestController.
@@ -64,7 +64,7 @@ func NewDownloadRequestController(
 	restoreInformer informers.RestoreInformer,
 	backupService cloudprovider.BackupService,
 	bucket string,
-	logger logrus.FieldLogger,
+	logger logger.Interface,
 ) Interface {
 	c := &downloadRequestController{
 		downloadRequestClient:       downloadRequestClient,
@@ -88,7 +88,7 @@ func NewDownloadRequestController(
 				if err != nil {
 					downloadRequest := obj.(*v1.DownloadRequest)
 					c.logger.WithError(errors.WithStack(err)).
-						WithField("downloadRequest", downloadRequest.Name).
+						WithFields("downloadRequest", downloadRequest.Name).
 						Error("Error creating queue key, item not added to queue")
 					return
 				}
@@ -173,7 +173,7 @@ func (c *downloadRequestController) processNextWorkItem() bool {
 		return true
 	}
 
-	c.logger.WithError(err).WithField("key", key).Error("Error in syncHandler, re-adding item to queue")
+	c.logger.WithError(err).WithFields("key", key).Error("Error in syncHandler, re-adding item to queue")
 
 	// we had an error processing the item so add it back
 	// into the queue for re-processing with rate-limiting
@@ -185,7 +185,7 @@ func (c *downloadRequestController) processNextWorkItem() bool {
 // processDownloadRequest is the default per-item sync handler. It generates a pre-signed URL for
 // a new DownloadRequest or deletes the DownloadRequest if it has expired.
 func (c *downloadRequestController) processDownloadRequest(key string) error {
-	logContext := c.logger.WithField("key", key)
+	logContext := c.logger.WithFields("key", key)
 
 	logContext.Debug("Running processDownloadRequest")
 	ns, name, err := cache.SplitMetaNamespaceKey(key)
@@ -250,7 +250,7 @@ func (c *downloadRequestController) generatePreSignedURL(downloadRequest *v1.Dow
 
 // deleteIfExpired deletes downloadRequest if it has expired.
 func (c *downloadRequestController) deleteIfExpired(downloadRequest *v1.DownloadRequest) error {
-	logContext := c.logger.WithField("key", kube.NamespaceAndName(downloadRequest))
+	logContext := c.logger.WithFields("key", kube.NamespaceAndName(downloadRequest))
 	logContext.Info("checking for expiration of DownloadRequest")
 	if downloadRequest.Status.Expiration.Time.Before(c.clock.Now()) {
 		logContext.Debug("DownloadRequest has not expired")
@@ -273,7 +273,7 @@ func (c *downloadRequestController) resync() {
 	for _, dr := range list {
 		key, err := cache.MetaNamespaceKeyFunc(dr)
 		if err != nil {
-			c.logger.WithError(errors.WithStack(err)).WithField("downloadRequest", dr.Name).Error("error generating key for download request")
+			c.logger.WithError(errors.WithStack(err)).WithFields("downloadRequest", dr.Name).Error("error generating key for download request")
 			continue
 		}
 

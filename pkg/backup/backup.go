@@ -22,8 +22,9 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/heptio/ark/pkg/logger/arklogrus"
+
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -36,7 +37,6 @@ import (
 	"github.com/heptio/ark/pkg/discovery"
 	"github.com/heptio/ark/pkg/util/collections"
 	kubeutil "github.com/heptio/ark/pkg/util/kube"
-	"github.com/heptio/ark/pkg/util/logging"
 )
 
 // Backupper performs backups.
@@ -212,11 +212,12 @@ func (kb *kubernetesBackupper) Backup(backup *api.Backup, backupFile, logFile io
 	gzippedLog := gzip.NewWriter(logFile)
 	defer gzippedLog.Close()
 
-	logger := logrus.New()
-	logger.Out = gzippedLog
-	logger.Hooks.Add(&logging.ErrorLocationHook{})
-	logger.Hooks.Add(&logging.LogLocationHook{})
-	log := logger.WithField("backup", kubeutil.NamespaceAndName(backup))
+	logger := arklogrus.New(
+		arklogrus.Out(gzippedLog),
+		arklogrus.Hook(&arklogrus.ErrorLocationHook{}),
+		arklogrus.Hook(&arklogrus.LogLocationHook{}),
+	)
+	log := logger.WithFields("backup", kubeutil.NamespaceAndName(backup))
 	log.Info("Starting backup")
 
 	namespaceIncludesExcludes := getNamespaceIncludesExcludes(backup)

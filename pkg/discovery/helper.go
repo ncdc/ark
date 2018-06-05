@@ -20,9 +20,9 @@ import (
 	"sort"
 	"sync"
 
+	"github.com/heptio/ark/pkg/logger"
 	kcmdutil "github.com/heptio/ark/third_party/kubernetes/pkg/kubectl/cmd/util"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -49,7 +49,7 @@ type Helper interface {
 
 type helper struct {
 	discoveryClient discovery.DiscoveryInterface
-	logger          logrus.FieldLogger
+	logger          logger.Interface
 
 	// lock guards mapper, resources and resourcesMap
 	lock         sync.RWMutex
@@ -60,7 +60,7 @@ type helper struct {
 
 var _ Helper = &helper{}
 
-func NewHelper(discoveryClient discovery.DiscoveryInterface, logger logrus.FieldLogger) (Helper, error) {
+func NewHelper(discoveryClient discovery.DiscoveryInterface, logger logger.Interface) (Helper, error) {
 	h := &helper{
 		discoveryClient: discoveryClient,
 	}

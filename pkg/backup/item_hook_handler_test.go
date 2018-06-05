@@ -22,10 +22,10 @@ import (
 	"time"
 
 	"github.com/heptio/ark/pkg/apis/ark/v1"
+	"github.com/heptio/ark/pkg/logger"
 	"github.com/heptio/ark/pkg/util/collections"
 	arktest "github.com/heptio/ark/pkg/util/test"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -39,7 +39,7 @@ type mockItemHookHandler struct {
 	mock.Mock
 }
 
-func (h *mockItemHookHandler) handleHooks(log logrus.FieldLogger, groupResource schema.GroupResource, obj runtime.Unstructured, resourceHooks []resourceHook, phase hookPhase) error {
+func (h *mockItemHookHandler) handleHooks(log logger.Interface, groupResource schema.GroupResource, obj runtime.Unstructured, resourceHooks []resourceHook, phase hookPhase) error {
 	args := h.Called(log, groupResource, obj, resourceHooks, phase)
 	return args.Error(0)
 }

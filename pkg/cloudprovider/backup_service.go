@@ -31,6 +31,7 @@ import (
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/generated/clientset/versioned/scheme"
+	"github.com/heptio/ark/pkg/logger"
 )
 
 // BackupService contains methods for working with backups in object storage.
@@ -100,14 +101,14 @@ func getRestoreResultsKey(directory, restore string) string {
 type backupService struct {
 	objectStore ObjectStore
 	decoder     runtime.Decoder
-	logger      logrus.FieldLogger
+	logger      logger.Interface
 }
 
 var _ BackupService = &backupService{}
 var _ BackupGetter = &backupService{}
 
 // NewBackupService creates a backup service using the provided object store
-func NewBackupService(objectStore ObjectStore, logger logrus.FieldLogger) BackupService {
+func NewBackupService(objectStore ObjectStore, logger logger.Interface) BackupService {
 	return &backupService{
 		objectStore: objectStore,
 		decoder:     scheme.Codecs.UniversalDecoder(api.SchemeGroupVersion),
@@ -193,7 +194,7 @@ func (br *backupService) GetAllBackups(bucket string) ([]*api.Backup, error) {
 	for _, backupDir := range prefixes {
 		backup, err := br.GetBackup(bucket, backupDir)
 		if err != nil {
-			br.logger.WithError(err).WithField("dir", backupDir).Error("Error reading backup directory")
+			br.logger.WithError(err).WithFields("dir", backupDir).Error("Error reading backup directory")
 			continue
 		}
 
@@ -287,7 +288,7 @@ func NewBackupServiceWithCachedBackupGetter(
 	ctx context.Context,
 	delegate BackupService,
 	resyncPeriod time.Duration,
-	logger logrus.FieldLogger,
+	logger logger.Interface,
 ) BackupService {
 	return &cachedBackupService{
 		BackupService: delegate,

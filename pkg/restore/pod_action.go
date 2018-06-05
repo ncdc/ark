@@ -19,19 +19,18 @@ package restore
 import (
 	"regexp"
 
-	"github.com/sirupsen/logrus"
-
 	"k8s.io/apimachinery/pkg/runtime"
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
+	"github.com/heptio/ark/pkg/logger"
 	"github.com/heptio/ark/pkg/util/collections"
 )
 
 type podAction struct {
-	logger logrus.FieldLogger
+	logger logger.Interface
 }
 
-func NewPodAction(logger logrus.FieldLogger) ItemAction {
+func NewPodAction(logger logger.Interface) ItemAction {
 	return &podAction{
 		logger: logger,
 	}
@@ -65,12 +64,12 @@ func (a *podAction) Execute(obj runtime.Unstructured, restore *api.Restore) (run
 			return err
 		}
 
-		a.logger.WithField("volumeName", name).Debug("Checking volume")
+		a.logger.WithFields("volumeName", name).Debug("Checking volume")
 		if !defaultTokenRegex.MatchString(name) {
-			a.logger.WithField("volumeName", name).Debug("Preserving volume")
+			a.logger.WithFields("volumeName", name).Debug("Preserving volume")
 			newVolumes = append(newVolumes, volume)
 		} else {
-			a.logger.WithField("volumeName", name).Debug("Excluding volume")
+			a.logger.WithFields("volumeName", name).Debug("Excluding volume")
 		}
 
 		return nil
@@ -91,12 +90,12 @@ func (a *podAction) Execute(obj runtime.Unstructured, restore *api.Restore) (run
 				return err
 			}
 
-			a.logger.WithField("volumeMount", name).Debug("Checking volumeMount")
+			a.logger.WithFields("volumeMount", name).Debug("Checking volumeMount")
 			if !defaultTokenRegex.MatchString(name) {
-				a.logger.WithField("volumeMount", name).Debug("Preserving volumeMount")
+				a.logger.WithFields("volumeMount", name).Debug("Preserving volumeMount")
 				newVolumeMounts = append(newVolumeMounts, volumeMount)
 			} else {
-				a.logger.WithField("volumeMount", name).Debug("Excluding volumeMount")
+				a.logger.WithFields("volumeMount", name).Debug("Excluding volumeMount")
 			}
 
 			return nil

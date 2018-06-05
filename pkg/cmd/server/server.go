@@ -31,6 +31,8 @@ import (
 	"time"
 
 	"github.com/heptio/ark/pkg/buildinfo"
+	"github.com/heptio/ark/pkg/logger"
+	"github.com/heptio/ark/pkg/logger/arklogrus"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -63,7 +65,6 @@ import (
 	"github.com/heptio/ark/pkg/plugin"
 	"github.com/heptio/ark/pkg/restore"
 	"github.com/heptio/ark/pkg/util/kube"
-	"github.com/heptio/ark/pkg/util/logging"
 	"github.com/heptio/ark/pkg/util/stringslice"
 )
 
@@ -91,7 +92,12 @@ func NewCommand() *cobra.Command {
 			}
 			logrus.Infof("setting log-level to %s", strings.ToUpper(logLevel.String()))
 
-			logger := newLogger(logLevel, &logging.ErrorLocationHook{}, &logging.LogLocationHook{})
+			logger := arklogrus.New(
+				// TODO fix parsing
+				arklogrus.Level(logger.InfoLevel),
+				arklogrus.Hook(&arklogrus.ErrorLocationHook{}),
+				arklogrus.Hook(&arklogrus.LogLocationHook{}),
+			)
 			logger.Infof("Starting Ark server %s", buildinfo.FormattedGitSHA())
 
 			// NOTE: the namespace flag is bound to ark's persistent flags when the root ark command
@@ -136,17 +142,6 @@ func getServerNamespace(namespaceFlag *pflag.Flag) string {
 	return api.DefaultNamespace
 }
 
-func newLogger(level logrus.Level, hooks ...logrus.Hook) *logrus.Logger {
-	logger := logrus.New()
-	logger.Level = level
-
-	for _, hook := range hooks {
-		logger.Hooks.Add(hook)
-	}
-
-	return logger
-}
-
 // getSortedLogLevels returns a string slice containing all of the valid logrus
 // log levels (based on logrus.AllLevels), sorted in ascending order of severity.
 func getSortedLogLevels() []string {
@@ -179,11 +174,11 @@ type server struct {
 	sharedInformerFactory informers.SharedInformerFactory
 	ctx                   context.Context
 	cancelFunc            context.CancelFunc
-	logger                logrus.FieldLogger
+	logger                logger.Interface
 	pluginManager         plugin.Manager
 }
 
-func newServer(namespace, baseName, pluginDir string, logger *logrus.Logger) (*server, error) {
+func newServer(namespace, baseName, pluginDir string, logger logger.Interface) (*server, error) {
 	clientConfig, err := client.Config("", "", baseName)
 	if err != nil {
 		return nil, err
@@ -199,7 +194,8 @@ func newServer(namespace, baseName, pluginDir string, logger *logrus.Logger) (*s
 		return nil, errors.WithStack(err)
 	}
 
-	pluginManager, err := plugin.NewManager(logger, logger.Level, pluginDir)
+	// TODO fix level
+	pluginManager, err := plugin.NewManager(logger, logrus.InfoLevel, pluginDir)
 	if err != nil {
 		return nil, err
 	}
@@ -259,7 +255,7 @@ func (s *server) run() error {
 }
 
 func (s *server) ensureArkNamespace() error {
-	logContext := s.logger.WithField("namespace", s.namespace)
+	logContext := s.logger.WithFields("namespace", s.namespace)
 
 	logContext.Info("Ensuring namespace exists for backups")
 	defaultNamespace := v1.Namespace{
@@ -316,7 +312,7 @@ var defaultResourcePriorities = []string{
 	"limitranges",
 }
 
-func applyConfigDefaults(c *api.Config, logger logrus.FieldLogger) {
+func applyConfigDefaults(c *api.Config, logger logger.Interface) {
 	if c.GCSyncPeriod.Duration == 0 {
 		c.GCSyncPeriod.Duration = defaultGCSyncPeriod
 	}
@@ -331,9 +327,9 @@ func applyConfigDefaults(c *api.Config, logger logrus.FieldLogger) {
 
 	if len(c.ResourcePriorities) == 0 {
 		c.ResourcePriorities = defaultResourcePriorities
-		logger.WithField("priorities", c.ResourcePriorities).Info("Using default resource priorities")
+		logger.WithFields("priorities", c.ResourcePriorities).Info("Using default resource priorities")
 	} else {
-		logger.WithField("priorities", c.ResourcePriorities).Info("Using resource priorities from config")
+		logger.WithFields("priorities", c.ResourcePriorities).Info("Using resource priorities from config")
 	}
 
 	if c.BackupStorageProvider.Config == nil {
@@ -352,10 +348,10 @@ func (s *server) watchConfig(config *api.Config) {
 	s.sharedInformerFactory.Ark().V1().Configs().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			updated := newObj.(*api.Config)
-			s.logger.WithField("name", kube.NamespaceAndName(updated)).Debug("received updated config")
+			s.logger.WithFields("name", kube.NamespaceAndName(updated)).Debug("received updated config")
 
 			if updated.Name != config.Name {
-				s.logger.WithField("name", updated.Name).Debug("Config watch channel received other config")
+				s.logger.WithFields("name", updated.Name).Debug("Config watch channel received other config")
 				return
 			}
 
@@ -642,7 +638,7 @@ func (s *server) removeDeprecatedGCFinalizer() {
 	}
 
 	for _, backup := range backups {
-		log := s.logger.WithField("backup", kube.NamespaceAndName(backup))
+		log := s.logger.WithFields("backup", kube.NamespaceAndName(backup))
 
 		if !stringslice.Has(backup.Finalizers, gcFinalizer) {
 			log.Debug("backup doesn't have deprecated finalizer - skipping")
@@ -695,7 +691,7 @@ func newRestorer(
 	resourcePriorities []string,
 	backupClient arkv1client.BackupsGetter,
 	kubeClient kubernetes.Interface,
-	logger logrus.FieldLogger,
+	logger logger.Interface,
 ) (restore.Restorer, error) {
 	return restore.NewKubernetesRestorer(
 		discoveryHelper,

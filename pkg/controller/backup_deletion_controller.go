@@ -27,6 +27,7 @@ import (
 	arkv1client "github.com/heptio/ark/pkg/generated/clientset/versioned/typed/ark/v1"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions/ark/v1"
 	listers "github.com/heptio/ark/pkg/generated/listers/ark/v1"
+	"github.com/heptio/ark/pkg/logger"
 	"github.com/heptio/ark/pkg/util/kube"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -57,7 +58,7 @@ type backupDeletionController struct {
 
 // NewBackupDeletionController creates a new backup deletion controller.
 func NewBackupDeletionController(
-	logger logrus.FieldLogger,
+	logger logger.Interface,
 	deleteBackupRequestInformer informers.DeleteBackupRequestInformer,
 	deleteBackupRequestClient arkv1client.DeleteBackupRequestsGetter,
 	backupClient arkv1client.BackupsGetter,
@@ -100,7 +101,7 @@ func NewBackupDeletionController(
 }
 
 func (c *backupDeletionController) processQueueItem(key string) error {
-	log := c.logger.WithField("key", key)
+	log := c.logger.WithFields("key", key)
 	log.Debug("Running processItem")
 
 	ns, name, err := cache.SplitMetaNamespaceKey(key)
@@ -219,7 +220,7 @@ func (c *backupDeletionController) processRequest(req *v1.DeleteBackupRequest) e
 	// Try to delete snapshots
 	log.Info("Removing PV snapshots")
 	for _, volumeBackup := range backup.Status.VolumeBackups {
-		log.WithField("snapshotID", volumeBackup.SnapshotID).Info("Removing snapshot associated with backup")
+		log.WithFields("snapshotID", volumeBackup.SnapshotID).Info("Removing snapshot associated with backup")
 		if err := c.snapshotService.DeleteSnapshot(volumeBackup.SnapshotID); err != nil {
 			errs = append(errs, errors.Wrapf(err, "error deleting snapshot %s", volumeBackup.SnapshotID).Error())
 		}
@@ -241,7 +242,7 @@ func (c *backupDeletionController) processRequest(req *v1.DeleteBackupRequest) e
 				continue
 			}
 
-			restoreLog := log.WithField("restore", kube.NamespaceAndName(restore))
+			restoreLog := log.WithFields("restore", kube.NamespaceAndName(restore))
 
 			restoreLog.Info("Deleting restore referencing backup")
 			if err := c.restoreClient.Restores(restore.Namespace).Delete(restore.Name, &metav1.DeleteOptions{}); err != nil {
@@ -273,7 +274,7 @@ func (c *backupDeletionController) processRequest(req *v1.DeleteBackupRequest) e
 		err = c.deleteBackupRequestClient.DeleteBackupRequests(req.Namespace).DeleteCollection(nil, listOptions)
 		if err != nil {
 			// If this errors, all we can do is log it.
-			c.logger.WithField("backup", kube.NamespaceAndName(backup)).Error("error deleting all associated DeleteBackupRequests after successfully deleting the backup")
+			c.logger.WithFields("backup", kube.NamespaceAndName(backup)).Error("error deleting all associated DeleteBackupRequests after successfully deleting the backup")
 		}
 	}
 

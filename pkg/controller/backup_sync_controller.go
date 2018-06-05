@@ -21,13 +21,13 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 
 	kuberrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	"github.com/heptio/ark/pkg/cloudprovider"
 	arkv1client "github.com/heptio/ark/pkg/generated/clientset/versioned/typed/ark/v1"
+	"github.com/heptio/ark/pkg/logger"
 	"github.com/heptio/ark/pkg/util/kube"
 	"github.com/heptio/ark/pkg/util/stringslice"
 )
@@ -38,7 +38,7 @@ type backupSyncController struct {
 	bucket        string
 	syncPeriod    time.Duration
 	namespace     string
-	logger        logrus.FieldLogger
+	logger        logger.Interface
 }
 
 func NewBackupSyncController(
@@ -47,7 +47,7 @@ func NewBackupSyncController(
 	bucket string,
 	syncPeriod time.Duration,
 	namespace string,
-	logger logrus.FieldLogger,
+	logger logger.Interface,
 ) Interface {
 	if syncPeriod < time.Minute {
 		logger.Infof("Provided backup sync period %v is too short. Setting to 1 minute", syncPeriod)
@@ -81,10 +81,10 @@ func (c *backupSyncController) run() {
 		c.logger.WithError(err).Error("error listing backups")
 		return
 	}
-	c.logger.WithField("backupCount", len(backups)).Info("Got backups from object storage")
+	c.logger.WithFields("backupCount", len(backups)).Info("Got backups from object storage")
 
 	for _, cloudBackup := range backups {
-		logContext := c.logger.WithField("backup", kube.NamespaceAndName(cloudBackup))
+		logContext := c.logger.WithFields("backup", kube.NamespaceAndName(cloudBackup))
 		logContext.Info("Syncing backup")
 
 		// If we're syncing backups made by pre-0.8.0 versions, the server removes all finalizers

@@ -43,6 +43,7 @@ import (
 	arkv1client "github.com/heptio/ark/pkg/generated/clientset/versioned/typed/ark/v1"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions/ark/v1"
 	listers "github.com/heptio/ark/pkg/generated/listers/ark/v1"
+	"github.com/heptio/ark/pkg/logger"
 	"github.com/heptio/ark/pkg/plugin"
 	"github.com/heptio/ark/pkg/restore"
 	"github.com/heptio/ark/pkg/util/collections"
@@ -67,7 +68,7 @@ type restoreController struct {
 	restoreListerSynced cache.InformerSynced
 	syncHandler         func(restoreName string) error
 	queue               workqueue.RateLimitingInterface
-	logger              logrus.FieldLogger
+	logger              logger.Interface
 	pluginManager       plugin.Manager
 }
 
@@ -81,7 +82,7 @@ func NewRestoreController(
 	bucket string,
 	backupInformer informers.BackupInformer,
 	pvProviderExists bool,
-	logger logrus.FieldLogger,
+	logger logger.Interface,
 	pluginManager plugin.Manager,
 ) Interface {
 	c := &restoreController{
@@ -121,7 +122,7 @@ func NewRestoreController(
 
 				key, err := cache.MetaNamespaceKeyFunc(restore)
 				if err != nil {
-					c.logger.WithError(errors.WithStack(err)).WithField("restore", restore).Error("Error creating queue key, item not added to queue")
+					c.logger.WithError(errors.WithStack(err)).WithFields("restore", restore).Error("Error creating queue key, item not added to queue")
 					return
 				}
 				c.queue.Add(key)
@@ -197,7 +198,7 @@ func (controller *restoreController) processNextWorkItem() bool {
 		return true
 	}
 
-	controller.logger.WithError(err).WithField("key", key).Error("Error in syncHandler, re-adding item to queue")
+	controller.logger.WithError(err).WithFields("key", key).Error("Error in syncHandler, re-adding item to queue")
 	// we had an error processing the item so add it back
 	// into the queue for re-processing with rate-limiting
 	controller.queue.AddRateLimited(key)
@@ -206,7 +207,7 @@ func (controller *restoreController) processNextWorkItem() bool {
 }
 
 func (controller *restoreController) processRestore(key string) error {
-	logContext := controller.logger.WithField("key", key)
+	logContext := controller.logger.WithFields("key", key)
 
 	logContext.Debug("Running processRestore")
 	ns, name, err := cache.SplitMetaNamespaceKey(key)
@@ -333,7 +334,7 @@ func (controller *restoreController) fetchBackup(bucket, name string) (*api.Back
 		return nil, errors.WithStack(err)
 	}
 
-	logContext := controller.logger.WithField("backupName", name)
+	logContext := controller.logger.WithFields("backupName", name)
 
 	logContext.Debug("Backup not found in backupLister, checking object storage directly")
 	backup, err = controller.backupService.GetBackup(bucket, name)
@@ -399,11 +400,11 @@ func (controller *restoreController) runRestore(restore *api.Restore, bucket str
 	defer func() {
 		for _, file := range tempFiles {
 			if err := file.Close(); err != nil {
-				logContext.WithError(errors.WithStack(err)).WithField("file", file.Name()).Error("Error closing file")
+				logContext.WithError(errors.WithStack(err)).WithFields("file", file.Name()).Error("Error closing file")
 			}
 
 			if err := os.Remove(file.Name()); err != nil {
-				logContext.WithError(errors.WithStack(err)).WithField("file", file.Name()).Error("Error removing file")
+				logContext.WithError(errors.WithStack(err)).WithFields("file", file.Name()).Error("Error removing file")
 			}
 		}
 	}()
@@ -455,7 +456,7 @@ func (controller *restoreController) runRestore(restore *api.Restore, bucket str
 	return
 }
 
-func downloadToTempFile(backupName string, backupService cloudprovider.BackupService, bucket string, logger logrus.FieldLogger) (*os.File, error) {
+func downloadToTempFile(backupName string, backupService cloudprovider.BackupService, bucket string, logger logger.Interface) (*os.File, error) {
 	readCloser, err := backupService.DownloadBackup(bucket, backupName)
 	if err != nil {
 		return nil, err
@@ -472,7 +473,7 @@ func downloadToTempFile(backupName string, backupService cloudprovider.BackupSer
 		return nil, errors.Wrap(err, "error copying Backup to temp file")
 	}
 
-	logContext := logger.WithField("backup", backupName)
+	logContext := logger.WithFields("backup", backupName)
 
 	logContext.WithFields(logrus.Fields{
 		"fileName": file.Name(),

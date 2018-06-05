@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 
 	"github.com/hashicorp/go-plugin"
-	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 
@@ -30,6 +29,7 @@ import (
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
 	arkbackup "github.com/heptio/ark/pkg/backup"
+	"github.com/heptio/ark/pkg/logger"
 	proto "github.com/heptio/ark/pkg/plugin/generated"
 )
 
@@ -130,7 +130,7 @@ func (c *BackupItemActionGRPCClient) Execute(item runtime.Unstructured, backup *
 	return &updatedItem, additionalItems, nil
 }
 
-func (c *BackupItemActionGRPCClient) SetLog(log logrus.FieldLogger) {
+func (c *BackupItemActionGRPCClient) SetLog(log logger.Interface) {
 	c.log.impl = log
 }
 

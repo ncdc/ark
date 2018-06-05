@@ -22,6 +22,7 @@ import (
 	"github.com/heptio/ark/pkg/cloudprovider"
 	"github.com/heptio/ark/pkg/discovery"
 	"github.com/heptio/ark/pkg/kuberesource"
+	"github.com/heptio/ark/pkg/logger"
 	"github.com/heptio/ark/pkg/util/collections"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -35,7 +36,7 @@ import (
 
 type resourceBackupperFactory interface {
 	newResourceBackupper(
-		log logrus.FieldLogger,
+		log logger.Interface,
 		backup *api.Backup,
 		namespaces *collections.IncludesExcludes,
 		resources *collections.IncludesExcludes,
@@ -55,7 +56,7 @@ type resourceBackupperFactory interface {
 type defaultResourceBackupperFactory struct{}
 
 func (f *defaultResourceBackupperFactory) newResourceBackupper(
-	log logrus.FieldLogger,
+	log logger.Interface,
 	backup *api.Backup,
 	namespaces *collections.IncludesExcludes,
 	resources *collections.IncludesExcludes,
@@ -94,7 +95,7 @@ type resourceBackupper interface {
 }
 
 type defaultResourceBackupper struct {
-	log                   logrus.FieldLogger
+	log                   logger.Interface
 	backup                *api.Backup
 	namespaces            *collections.IncludesExcludes
 	resources             *collections.IncludesExcludes
@@ -125,7 +126,7 @@ func (rb *defaultResourceBackupper) backupResource(
 	gr := schema.GroupResource{Group: gv.Group, Resource: resource.Name}
 	grString := gr.String()
 
-	log := rb.log.WithField("groupResource", grString)
+	log := rb.log.WithFields("groupResource", grString)
 
 	log.Info("Evaluating resource")
 
@@ -203,7 +204,7 @@ func (rb *defaultResourceBackupper) backupResource(
 		}
 
 		for _, ns := range namespacesToList {
-			log.WithField("namespace", ns).Info("Getting namespace")
+			log.WithFields("namespace", ns).Info("Getting namespace")
 			unstructured, err := resourceClient.Get(ns, metav1.GetOptions{})
 			if err != nil {
 				errs = append(errs, errors.Wrap(err, "error getting namespace"))
@@ -212,7 +213,7 @@ func (rb *defaultResourceBackupper) backupResource(
 
 			labels := labels.Set(unstructured.GetLabels())
 			if labelSelector != nil && !labelSelector.Matches(labels) {
-				log.WithField("name", unstructured.GetName()).Info("skipping item because it does not match the backup's label selector")
+				log.WithFields("name", unstructured.GetName()).Info("skipping item because it does not match the backup's label selector")
 				continue
 			}
 
@@ -235,7 +236,7 @@ func (rb *defaultResourceBackupper) backupResource(
 			return err
 		}
 
-		log.WithField("namespace", namespace).Info("Listing items")
+		log.WithFields("namespace", namespace).Info("Listing items")
 		unstructuredList, err := resourceClient.List(metav1.ListOptions{LabelSelector: rb.labelSelector})
 		if err != nil {
 			return errors.WithStack(err)
@@ -247,7 +248,7 @@ func (rb *defaultResourceBackupper) backupResource(
 			return errors.WithStack(err)
 		}
 
-		log.WithField("namespace", namespace).Infof("Retrieved %d items", len(items))
+		log.WithFields("namespace", namespace).Infof("Retrieved %d items", len(items))
 		for _, item := range items {
 			unstructured, ok := item.(runtime.Unstructured)
 			if !ok {
@@ -262,7 +263,7 @@ func (rb *defaultResourceBackupper) backupResource(
 			}
 
 			if gr == kuberesource.Namespaces && !rb.namespaces.ShouldInclude(metadata.GetName()) {
-				log.WithField("name", metadata.GetName()).Info("skipping namespace because it is excluded")
+				log.WithFields("name", metadata.GetName()).Info("skipping namespace because it is excluded")
 				continue
 			}
 

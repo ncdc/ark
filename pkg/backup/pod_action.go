@@ -18,23 +18,23 @@ package backup
 
 import (
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/kuberesource"
+	"github.com/heptio/ark/pkg/logger"
 	"github.com/heptio/ark/pkg/util/collections"
 )
 
 // podAction implements ItemAction.
 type podAction struct {
-	log logrus.FieldLogger
+	log logger.Interface
 }
 
 // NewPodAction creates a new ItemAction for pods.
-func NewPodAction(log logrus.FieldLogger) ItemAction {
+func NewPodAction(log logger.Interface) ItemAction {
 	return &podAction{log: log}
 }
 

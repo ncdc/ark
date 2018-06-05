@@ -17,19 +17,18 @@ limitations under the License.
 package plugin
 
 import (
+	"github.com/heptio/ark/pkg/logger/arklogrus"
 	"github.com/sirupsen/logrus"
 
-	"github.com/heptio/ark/pkg/util/logging"
+	"github.com/heptio/ark/pkg/logger"
 )
 
 // NewLogger returns a logger that is suitable for use within an
 // Ark plugin.
-func NewLogger() logrus.FieldLogger {
-	logger := logrus.New()
-
+func NewLogger() logger.Interface {
 	// we use the JSON formatter because go-plugin will parse incoming
 	// JSON on stderr and use it to create structured log entries.
-	logger.Formatter = &logrus.JSONFormatter{
+	formatter := &logrus.JSONFormatter{
 		FieldMap: logrus.FieldMap{
 			// this is the hclog-compatible message field
 			logrus.FieldKeyMsg: "@message",
@@ -39,14 +38,16 @@ func NewLogger() logrus.FieldLogger {
 		DisableTimestamp: true,
 	}
 
-	// set a logger name for the location hook which will signal to the Ark
-	// server logger that the location has been set within a hook.
-	logger.Hooks.Add((&logging.LogLocationHook{}).WithLoggerName("plugin"))
-
-	// this hook adjusts the string representation of WarnLevel to "warn"
-	// rather than "warning" to make it parseable by go-plugin within the
-	// Ark server code
-	logger.Hooks.Add(&logging.HcLogLevelHook{})
+	logger := arklogrus.New(
+		arklogrus.Formatter(formatter),
+		// set a logger name for the location hook which will signal to the Ark
+		// server logger that the location has been set within a hook.
+		arklogrus.Hook((&arklogrus.LogLocationHook{}).WithLoggerName("plugin")),
+		// this hook adjusts the string representation of WarnLevel to "warn"
+		// rather than "warning" to make it parseable by go-plugin within the
+		// Ark server code
+		arklogrus.Hook(&arklogrus.HcLogLevelHook{}),
+	)
 
 	return logger
 }

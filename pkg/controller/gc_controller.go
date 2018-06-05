@@ -20,6 +20,7 @@ import (
 	"time"
 
 	pkgbackup "github.com/heptio/ark/pkg/backup"
+	"github.com/heptio/ark/pkg/logger"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
@@ -37,7 +38,7 @@ import (
 type gcController struct {
 	*genericController
 
-	logger                    logrus.FieldLogger
+	logger                    logger.Interface
 	backupLister              listers.BackupLister
 	deleteBackupRequestClient arkv1client.DeleteBackupRequestsGetter
 	syncPeriod                time.Duration
@@ -47,13 +48,13 @@ type gcController struct {
 
 // NewGCController constructs a new gcController.
 func NewGCController(
-	logger logrus.FieldLogger,
+	logger logger.Interface,
 	backupInformer informers.BackupInformer,
 	deleteBackupRequestClient arkv1client.DeleteBackupRequestsGetter,
 	syncPeriod time.Duration,
 ) Interface {
 	if syncPeriod < time.Minute {
-		logger.WithField("syncPeriod", syncPeriod).Info("Provided GC sync period is too short. Setting to 1 minute")
+		logger.WithFields("syncPeriod", syncPeriod).Info("Provided GC sync period is too short. Setting to 1 minute")
 		syncPeriod = time.Minute
 	}
 
@@ -99,7 +100,7 @@ func (c *gcController) enqueueAllBackups() {
 }
 
 func (c *gcController) processQueueItem(key string) error {
-	log := c.logger.WithField("backup", key)
+	log := c.logger.WithFields("backup", key)
 
 	ns, name, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {

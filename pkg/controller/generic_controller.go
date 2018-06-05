@@ -21,8 +21,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/heptio/ark/pkg/logger"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
@@ -32,18 +32,18 @@ import (
 type genericController struct {
 	name             string
 	queue            workqueue.RateLimitingInterface
-	logger           logrus.FieldLogger
+	logger           logger.Interface
 	syncHandler      func(key string) error
 	resyncFunc       func()
 	resyncPeriod     time.Duration
 	cacheSyncWaiters []cache.InformerSynced
 }
 
-func newGenericController(name string, logger logrus.FieldLogger) *genericController {
+func newGenericController(name string, logger logger.Interface) *genericController {
 	c := &genericController{
 		name:   name,
 		queue:  workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), name),
-		logger: logger.WithField("controller", name),
+		logger: logger.WithFields("controller", name),
 	}
 
 	return c
@@ -133,7 +133,7 @@ func (c *genericController) processNextWorkItem() bool {
 		return true
 	}
 
-	c.logger.WithError(err).WithField("key", key).Error("Error in syncHandler, re-adding item to queue")
+	c.logger.WithError(err).WithFields("key", key).Error("Error in syncHandler, re-adding item to queue")
 	// we had an error processing the item so add it back
 	// into the queue for re-processing with rate-limiting
 	c.queue.AddRateLimited(key)

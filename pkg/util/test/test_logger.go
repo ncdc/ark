@@ -19,11 +19,12 @@ package test
 import (
 	"io/ioutil"
 
-	"github.com/sirupsen/logrus"
+	"github.com/heptio/ark/pkg/logger/arklogrus"
+
+	"github.com/heptio/ark/pkg/logger"
 )
 
-func NewLogger() logrus.FieldLogger {
-	logger := logrus.New()
-	logger.Out = ioutil.Discard
-	return logrus.NewEntry(logger)
+func NewLogger() logger.Interface {
+	log := arklogrus.New(arklogrus.Out(ioutil.Discard))
+	return log
 }

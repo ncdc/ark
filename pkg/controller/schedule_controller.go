@@ -41,6 +41,7 @@ import (
 	arkv1client "github.com/heptio/ark/pkg/generated/clientset/versioned/typed/ark/v1"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions/ark/v1"
 	listers "github.com/heptio/ark/pkg/generated/listers/ark/v1"
+	"github.com/heptio/ark/pkg/logger"
 	kubeutil "github.com/heptio/ark/pkg/util/kube"
 )
 
@@ -54,7 +55,7 @@ type scheduleController struct {
 	queue                 workqueue.RateLimitingInterface
 	syncPeriod            time.Duration
 	clock                 clock.Clock
-	logger                logrus.FieldLogger
+	logger                logger.Interface
 }
 
 func NewScheduleController(
@@ -63,10 +64,10 @@ func NewScheduleController(
 	backupsClient arkv1client.BackupsGetter,
 	schedulesInformer informers.ScheduleInformer,
 	syncPeriod time.Duration,
-	logger logrus.FieldLogger,
+	logger logger.Interface,
 ) *scheduleController {
 	if syncPeriod < time.Minute {
-		logger.WithField("syncPeriod", syncPeriod).Info("Provided schedule sync period is too short. Setting to 1 minute")
+		logger.WithFields("syncPeriod", syncPeriod).Info("Provided schedule sync period is too short. Setting to 1 minute")
 		syncPeriod = time.Minute
 	}
 
@@ -102,7 +103,7 @@ func NewScheduleController(
 
 				key, err := cache.MetaNamespaceKeyFunc(schedule)
 				if err != nil {
-					c.logger.WithError(errors.WithStack(err)).WithField("schedule", schedule).Error("Error creating queue key, item not added to queue")
+					c.logger.WithError(errors.WithStack(err)).WithFields("schedule", schedule).Error("Error creating queue key, item not added to queue")
 					return
 				}
 				c.queue.Add(key)
@@ -169,7 +170,7 @@ func (controller *scheduleController) enqueueAllEnabledSchedules() {
 
 		key, err := cache.MetaNamespaceKeyFunc(schedule)
 		if err != nil {
-			controller.logger.WithError(errors.WithStack(err)).WithField("schedule", schedule).Error("Error creating queue key, item not added to queue")
+			controller.logger.WithError(errors.WithStack(err)).WithFields("schedule", schedule).Error("Error creating queue key, item not added to queue")
 			continue
 		}
 		controller.queue.Add(key)
@@ -200,7 +201,7 @@ func (controller *scheduleController) processNextWorkItem() bool {
 		return true
 	}
 
-	controller.logger.WithError(err).WithField("key", key).Error("Error in syncHandler, re-adding item to queue")
+	controller.logger.WithError(err).WithFields("key", key).Error("Error in syncHandler, re-adding item to queue")
 	// we had an error processing the item so add it back
 	// into the queue for re-processing with rate-limiting
 	controller.queue.AddRateLimited(key)
@@ -209,7 +210,7 @@ func (controller *scheduleController) processNextWorkItem() bool {
 }
 
 func (controller *scheduleController) processSchedule(key string) error {
-	logContext := controller.logger.WithField("key", key)
+	logContext := controller.logger.WithFields("key", key)
 
 	logContext.Debug("Running processSchedule")
 	ns, name, err := cache.SplitMetaNamespaceKey(key)
@@ -274,7 +275,7 @@ func (controller *scheduleController) processSchedule(key string) error {
 	return nil
 }
 
-func parseCronSchedule(itm *api.Schedule, logger logrus.FieldLogger) (cron.Schedule, []string) {
+func parseCronSchedule(itm *api.Schedule, logger logger.Interface) (cron.Schedule, []string) {
 	var validationErrors []string
 	var schedule cron.Schedule
 
@@ -284,7 +285,7 @@ func parseCronSchedule(itm *api.Schedule, logger logrus.FieldLogger) (cron.Sched
 		return nil, validationErrors
 	}
 
-	logContext := logger.WithField("schedule", kubeutil.NamespaceAndName(itm))
+	logContext := logger.WithFields("schedule", kubeutil.NamespaceAndName(itm))
 
 	// adding a recover() around cron.Parse because it panics on empty string and is possible
 	// that it panics under other scenarios as well.
@@ -300,7 +301,7 @@ func parseCronSchedule(itm *api.Schedule, logger logrus.FieldLogger) (cron.Sched
 		}()
 
 		if res, err := cron.ParseStandard(itm.Spec.Schedule); err != nil {
-			logContext.WithError(errors.WithStack(err)).WithField("schedule", itm.Spec.Schedule).Debug("Error parsing schedule")
+			logContext.WithError(errors.WithStack(err)).WithFields("schedule", itm.Spec.Schedule).Debug("Error parsing schedule")
 			validationErrors = append(validationErrors, fmt.Sprintf("invalid schedule: %v", err))
 		} else {
 			schedule = res
@@ -318,11 +319,11 @@ func (controller *scheduleController) submitBackupIfDue(item *api.Schedule, cron
 	var (
 		now                = controller.clock.Now()
 		isDue, nextRunTime = getNextRunTime(item, cronSchedule, now)
-		logContext         = controller.logger.WithField("schedule", kubeutil.NamespaceAndName(item))
+		logContext         = controller.logger.WithFields("schedule", kubeutil.NamespaceAndName(item))
 	)
 
 	if !isDue {
-		logContext.WithField("nextRunTime", nextRunTime).Info("Schedule is not due, skipping")
+		logContext.WithFields("nextRunTime", nextRunTime).Info("Schedule is not due, skipping")
 		return nil
 	}
 
@@ -332,7 +333,7 @@ func (controller *scheduleController) submitBackupIfDue(item *api.Schedule, cron
 	// It might also make sense in the future to explicitly check for currently-running
 	// backups so that we don't overlap runs (for disk snapshots in particular, this can
 	// lead to performance issues).
-	logContext.WithField("nextRunTime", nextRunTime).Info("Schedule is due, submitting Backup")
+	logContext.WithFields("nextRunTime", nextRunTime).Info("Schedule is due, submitting Backup")
 	backup := getBackup(item, now)
 	if _, err := controller.backupsClient.Backups(backup.Namespace).Create(backup); err != nil {
 		return errors.Wrap(err, "error creating Backup")

@@ -21,7 +21,6 @@ import (
 
 	"github.com/hashicorp/go-plugin"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 
@@ -29,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
+	"github.com/heptio/ark/pkg/logger"
 	proto "github.com/heptio/ark/pkg/plugin/generated"
 	"github.com/heptio/ark/pkg/restore"
 )
@@ -120,7 +120,7 @@ func (c *RestoreItemActionGRPCClient) Execute(item runtime.Unstructured, restore
 	return &updatedItem, warning, nil
 }
 
-func (c *RestoreItemActionGRPCClient) SetLog(log logrus.FieldLogger) {
+func (c *RestoreItemActionGRPCClient) SetLog(log logger.Interface) {
 	c.log.impl = log
 }
 

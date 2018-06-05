@@ -28,7 +28,6 @@ import (
 	"sort"
 
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -47,10 +46,11 @@ import (
 	"github.com/heptio/ark/pkg/discovery"
 	arkv1client "github.com/heptio/ark/pkg/generated/clientset/versioned/typed/ark/v1"
 	"github.com/heptio/ark/pkg/kuberesource"
+	"github.com/heptio/ark/pkg/logger"
+	"github.com/heptio/ark/pkg/logger/arklogrus"
 	"github.com/heptio/ark/pkg/util/boolptr"
 	"github.com/heptio/ark/pkg/util/collections"
 	"github.com/heptio/ark/pkg/util/kube"
-	"github.com/heptio/ark/pkg/util/logging"
 )
 
 // Restorer knows how to restore a backup.
@@ -72,12 +72,12 @@ type kubernetesRestorer struct {
 	namespaceClient    corev1.NamespaceInterface
 	resourcePriorities []string
 	fileSystem         FileSystem
-	logger             logrus.FieldLogger
+	logger             logger.Interface
 }
 
 // prioritizeResources returns an ordered, fully-resolved list of resources to restore based on
 // the provided discovery helper, resource priorities, and included/excluded resources.
-func prioritizeResources(helper discovery.Helper, priorities []string, includedResources *collections.IncludesExcludes, logger logrus.FieldLogger) ([]schema.GroupResource, error) {
+func prioritizeResources(helper discovery.Helper, priorities []string, includedResources *collections.IncludesExcludes, logger logger.Interface) ([]schema.GroupResource, error) {
 	var ret []schema.GroupResource
 
 	// set keeps track of resolved GroupResource names
@@ -92,7 +92,7 @@ func prioritizeResources(helper discovery.Helper, priorities []string, includedR
 		gr := gvr.GroupResource()
 
 		if !includedResources.ShouldInclude(gr.String()) {
-			logger.WithField("groupResource", gr).Info("Not including resource")
+			logger.WithFields("groupResource", gr).Info("Not including resource")
 			continue
 		}
 		ret = append(ret, gr)
@@ -112,7 +112,7 @@ func prioritizeResources(helper discovery.Helper, priorities []string, includedR
 			gr := groupVersion.WithResource(resource.Name).GroupResource()
 
 			if !includedResources.ShouldInclude(gr.String()) {
-				logger.WithField("groupResource", gr.String()).Info("Not including resource")
+				logger.WithFields("groupResource", gr.String()).Info("Not including resource")
 				continue
 			}
 
@@ -142,7 +142,7 @@ func NewKubernetesRestorer(
 	resourcePriorities []string,
 	backupClient arkv1client.BackupsGetter,
 	namespaceClient corev1.NamespaceInterface,
-	logger logrus.FieldLogger,
+	logger logger.Interface,
 ) (Restorer, error) {
 	return &kubernetesRestorer{
 		discoveryHelper:    discoveryHelper,
@@ -178,10 +178,11 @@ func (kr *kubernetesRestorer) Restore(restore *api.Restore, backup *api.Backup, 
 	gzippedLog := gzip.NewWriter(logFile)
 	defer gzippedLog.Close()
 
-	log := logrus.New()
-	log.Out = gzippedLog
-	log.Hooks.Add(&logging.ErrorLocationHook{})
-	log.Hooks.Add(&logging.LogLocationHook{})
+	log := arklogrus.New(
+		arklogrus.Out(gzippedLog),
+		arklogrus.Hook(&arklogrus.ErrorLocationHook{}),
+		arklogrus.Hook(&arklogrus.LogLocationHook{}),
+	)
 
 	// get resource includes-excludes
 	resourceIncludesExcludes := getResourceIncludesExcludes(kr.discoveryHelper, restore.Spec.IncludedResources, restore.Spec.ExcludedResources)
@@ -280,7 +281,7 @@ type context struct {
 	restore              *api.Restore
 	prioritizedResources []schema.GroupResource
 	selector             labels.Selector
-	logger               logrus.FieldLogger
+	logger               logger.Interface
 	dynamicFactory       client.DynamicFactory
 	fileSystem           FileSystem
 	namespaceClient      corev1.NamespaceInterface
@@ -408,7 +409,7 @@ func (ctx *context) restoreFromDir(dir string) (api.RestoreResult, api.RestoreRe
 			// (in order to get any backed-up metadata), but if we don't find it there,
 			// create a blank one.
 			if !existingNamespaces.Has(mappedNsName) {
-				logger := ctx.logger.WithField("namespace", nsName)
+				logger := ctx.logger.WithFields("namespace", nsName)
 				ns := getNamespace(logger, filepath.Join(dir, api.ResourcesDir, "namespaces", api.ClusterScopedDir, nsName+".json"), mappedNsName)
 				if _, err := kube.EnsureNamespaceExists(ns, ctx.namespaceClient); err != nil {
 					addArkError(&errs, err)
@@ -433,7 +434,7 @@ func (ctx *context) restoreFromDir(dir string) (api.RestoreResult, api.RestoreRe
 // create before restoring anything into it. It will come from the backup
 // tarball if it exists, else will be a new one. If from the tarball, it
 // will retain its labels, annotations, and spec.
-func getNamespace(logger logrus.FieldLogger, path, remappedName string) *v1.Namespace {
+func getNamespace(logger logger.Interface, path, remappedName string) *v1.Namespace {
 	var nsBytes []byte
 	var err error
 
@@ -617,7 +618,7 @@ func (ctx *context) restoreResource(resource, namespace, resourcePath string) (a
 
 			ctx.infof("Executing item action for %v", &groupResource)
 
-			if logSetter, ok := action.ItemAction.(logging.LogSetter); ok {
+			if logSetter, ok := action.ItemAction.(logger.LogSetter); ok {
 				logSetter.SetLog(ctx.logger)
 			}
 

@@ -29,6 +29,7 @@ import (
 
 	"github.com/heptio/ark/pkg/backup"
 	"github.com/heptio/ark/pkg/cloudprovider"
+	"github.com/heptio/ark/pkg/logger"
 	"github.com/heptio/ark/pkg/restore"
 )
 
@@ -130,7 +131,7 @@ type Manager interface {
 }
 
 type manager struct {
-	logger         logrus.FieldLogger
+	logger         logger.Interface
 	logLevel       logrus.Level
 	pluginRegistry *registry
 	clientStore    *clientStore
@@ -138,7 +139,7 @@ type manager struct {
 }
 
 // NewManager constructs a manager for getting plugin implementations.
-func NewManager(logger logrus.FieldLogger, level logrus.Level, pluginDir string) (Manager, error) {
+func NewManager(logger logger.Interface, level logrus.Level, pluginDir string) (Manager, error) {
 	m := &manager{
 		logger:         logger,
 		logLevel:       level,

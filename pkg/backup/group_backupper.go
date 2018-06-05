@@ -21,7 +21,6 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -31,12 +30,13 @@ import (
 	"github.com/heptio/ark/pkg/client"
 	"github.com/heptio/ark/pkg/cloudprovider"
 	"github.com/heptio/ark/pkg/discovery"
+	"github.com/heptio/ark/pkg/logger"
 	"github.com/heptio/ark/pkg/util/collections"
 )
 
 type groupBackupperFactory interface {
 	newGroupBackupper(
-		log logrus.FieldLogger,
+		log logger.Interface,
 		backup *v1.Backup,
 		namespaces, resources *collections.IncludesExcludes,
 		labelSelector string,
@@ -55,7 +55,7 @@ type groupBackupperFactory interface {
 type defaultGroupBackupperFactory struct{}
 
 func (f *defaultGroupBackupperFactory) newGroupBackupper(
-	log logrus.FieldLogger,
+	log logger.Interface,
 	backup *v1.Backup,
 	namespaces, resources *collections.IncludesExcludes,
 	labelSelector string,
@@ -93,7 +93,7 @@ type groupBackupper interface {
 }
 
 type defaultGroupBackupper struct {
-	log                      logrus.FieldLogger
+	log                      logger.Interface
 	backup                   *v1.Backup
 	namespaces, resources    *collections.IncludesExcludes
 	labelSelector            string
@@ -113,7 +113,7 @@ type defaultGroupBackupper struct {
 func (gb *defaultGroupBackupper) backupGroup(group *metav1.APIResourceList) error {
 	var (
 		errs []error
-		log  = gb.log.WithField("group", group.GroupVersion)
+		log  = gb.log.WithFields("group", group.GroupVersion)
 		rb   = gb.resourceBackupperFactory.newResourceBackupper(
 			log,
 			gb.backup,

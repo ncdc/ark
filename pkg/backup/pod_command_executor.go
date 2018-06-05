@@ -22,6 +22,7 @@ import (
 	"time"
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
+	"github.com/heptio/ark/pkg/logger"
 	"github.com/heptio/ark/pkg/util/collections"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -35,7 +36,7 @@ import (
 type podCommandExecutor interface {
 	// executePodCommand executes a command in a container in a pod. If the command takes longer than
 	// the specified timeout, an error is returned.
-	executePodCommand(log logrus.FieldLogger, item map[string]interface{}, namespace, name, hookName string, hook *api.ExecHook) error
+	executePodCommand(log logger.Interface, item map[string]interface{}, namespace, name, hookName string, hook *api.ExecHook) error
 }
 
 type poster interface {
@@ -63,7 +64,7 @@ func NewPodCommandExecutor(restClientConfig *rest.Config, restClient poster) pod
 // command takes longer than the specified timeout, an error is returned (NOTE: it is not currently
 // possible to ensure the command is terminated when the timeout occurs, so it may continue to run
 // in the background).
-func (e *defaultPodCommandExecutor) executePodCommand(log logrus.FieldLogger, item map[string]interface{}, namespace, name, hookName string, hook *api.ExecHook) error {
+func (e *defaultPodCommandExecutor) executePodCommand(log logger.Interface, item map[string]interface{}, namespace, name, hookName string, hook *api.ExecHook) error {
 	if item == nil {
 		return errors.New("item is required")
 	}

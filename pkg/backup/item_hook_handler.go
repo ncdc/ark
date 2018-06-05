@@ -23,6 +23,7 @@ import (
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/kuberesource"
+	"github.com/heptio/ark/pkg/logger"
 	"github.com/heptio/ark/pkg/util/collections"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -47,7 +48,7 @@ type itemHookHandler interface {
 	// determine if there are any hooks relevant to the item, taking into account the hook spec's
 	// namespaces, resources, and label selector.
 	handleHooks(
-		log logrus.FieldLogger,
+		log logger.Interface,
 		groupResource schema.GroupResource,
 		obj runtime.Unstructured,
 		resourceHooks []resourceHook,
@@ -61,7 +62,7 @@ type defaultItemHookHandler struct {
 }
 
 func (h *defaultItemHookHandler) handleHooks(
-	log logrus.FieldLogger,
+	log logger.Interface,
 	groupResource schema.GroupResource,
 	obj runtime.Unstructured,
 	resourceHooks []resourceHook,

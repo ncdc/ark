@@ -21,11 +21,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sirupsen/logrus"
-
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	"github.com/heptio/ark/pkg/apis/ark/v1"
+	"github.com/heptio/ark/pkg/logger"
 )
 
 // backupCacheBucket holds the backups and error from a GetAllBackups call.
@@ -41,13 +40,13 @@ type backupCache struct {
 	// This doesn't really need to be a map right now, but if we ever move to supporting multiple
 	// buckets, this will be ready for it.
 	buckets map[string]*backupCacheBucket
-	logger  logrus.FieldLogger
+	logger  logger.Interface
 }
 
 var _ BackupGetter = &backupCache{}
 
 // NewBackupCache returns a new backup cache that refreshes from delegate every resyncPeriod.
-func NewBackupCache(ctx context.Context, delegate BackupGetter, resyncPeriod time.Duration, logger logrus.FieldLogger) BackupGetter {
+func NewBackupCache(ctx context.Context, delegate BackupGetter, resyncPeriod time.Duration, logger logger.Interface) BackupGetter {
 	c := &backupCache{
 		delegate: delegate,
 		buckets:  make(map[string]*backupCacheBucket),
@@ -69,7 +68,7 @@ func (c *backupCache) refresh() {
 	c.logger.Debug("refreshing all cached backup lists from object storage")
 
 	for bucketName, bucket := range c.buckets {
-		c.logger.WithField("bucket", bucketName).Debug("Refreshing bucket")
+		c.logger.WithFields("bucket", bucketName).Debug("Refreshing bucket")
 		bucket.backups, bucket.error = c.delegate.GetAllBackups(bucketName)
 	}
 }
@@ -79,7 +78,7 @@ func (c *backupCache) GetAllBackups(bucketName string) ([]*v1.Backup, error) {
 	bucket, found := c.buckets[bucketName]
 	c.lock.RUnlock()
 
-	logContext := c.logger.WithField("bucket", bucketName)
+	logContext := c.logger.WithFields("bucket", bucketName)
 
 	if found {
 		logContext.Debug("Returning cached backup list")

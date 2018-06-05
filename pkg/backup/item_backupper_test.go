@@ -26,10 +26,10 @@ import (
 
 	"github.com/heptio/ark/pkg/apis/ark/v1"
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
+	"github.com/heptio/ark/pkg/logger"
 	"github.com/heptio/ark/pkg/util/collections"
 	arktest "github.com/heptio/ark/pkg/util/test"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -646,7 +646,7 @@ type mockItemBackupper struct {
 	mock.Mock
 }
 
-func (ib *mockItemBackupper) backupItem(logger logrus.FieldLogger, obj runtime.Unstructured, groupResource schema.GroupResource) error {
+func (ib *mockItemBackupper) backupItem(logger logger.Interface, obj runtime.Unstructured, groupResource schema.GroupResource) error {
 	args := ib.Called(logger, obj, groupResource)
 	return args.Error(0)
 }

@@ -23,7 +23,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/satori/uuid"
-	"github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/compute/v1"
@@ -31,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/heptio/ark/pkg/cloudprovider"
+	"github.com/heptio/ark/pkg/logger"
 	"github.com/heptio/ark/pkg/util/collections"
 )
 
@@ -39,10 +39,10 @@ const projectKey = "project"
 type blockStore struct {
 	gce     *compute.Service
 	project string
-	log     logrus.FieldLogger
+	log     logger.Interface
 }
 
-func NewBlockStore(log logrus.FieldLogger) cloudprovider.BlockStore {
+func NewBlockStore(log logger.Interface) cloudprovider.BlockStore {
 	return &blockStore{log: log}
 }
 
@@ -175,7 +175,7 @@ func (b *blockStore) CreateSnapshot(volumeID, volumeAZ string, tags map[string]s
 	return gceSnap.Name, nil
 }
 
-func getSnapshotTags(arkTags map[string]string, diskDescription string, log logrus.FieldLogger) string {
+func getSnapshotTags(arkTags map[string]string, diskDescription string, log logger.Interface) string {
 	// Kubernetes uses the description field of GCP disks to store a JSON doc containing
 	// tags.
 	//
