@@ -1,0 +1,14 @@
+@startuml
+
+apiserver->ReplicationController: here's foo-east1
+ReplicationController->ObjectStorage: does foo-west1 exist?
+ObjectStorage->ReplicationController: no
+ReplicationController->ObjectStorage: copy foo-east1 as foo-west1
+ObjectStorage->SyncController: list backups
+SyncController->apiserver: create backup foo-west1
+apiserver->ReplicationController: here's backup foo-west1
+ReplicationController->ObjectStorage: does foo-east1 exist?
+ObjectStorage->ReplicationController: yes
+ReplicationController->ReplicationController: no-op
+
+@enduml

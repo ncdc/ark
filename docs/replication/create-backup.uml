@@ -1,0 +1,9 @@
+@startuml
+
+User->ArkCLI: create backup foo
+ArkCLI->apiserver: create backup foo-east1
+apiserver->BackupController: here's backup foo-east1
+BackupController->ObjectStorage: upload backup foo-east1
+BackupController->apiserver: backup foo-east1 Completed
+
+@enduml
